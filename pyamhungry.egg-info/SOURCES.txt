@@ -1,0 +1,6 @@
+pyamhungry/__init__.py
+pyamhungry/test.py
+pyamhungry.egg-info/PKG-INFO
+pyamhungry.egg-info/SOURCES.txt
+pyamhungry.egg-info/dependency_links.txt
+pyamhungry.egg-info/top_level.txt

@@ -1,0 +1,8 @@
+test1:
+  en:
+    title: 
+    city : "Kyoto"
+    genre: "Fowl, Yakitori (Grilled chicken), Mizutaki"
+    hours: "FIGURE OUT HOW TO HANDLE THIS"
+    price_lunch: !!python/tuple [4000, 9000, "yen"]
+    price_dinner: !!python/tuple [4000, 9000, "yen"]
