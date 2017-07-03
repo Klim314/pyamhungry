@@ -1,8 +1,19 @@
-test1:
-  en:
-    title: 
-    city : "Kyoto"
-    genre: "Fowl, Yakitori (Grilled chicken), Mizutaki"
-    hours: "FIGURE OUT HOW TO HANDLE THIS"
-    price_lunch: !!python/tuple [4000, 9000, "yen"]
-    price_dinner: !!python/tuple [4000, 9000, "yen"]
+test1e:
+  address: 京都府京都市北区烏丸通鞍馬口東入ル上江町232-9
+  title: Taketorineo  (竹とりNEO)
+  city : "Kyoto"
+  genre: ["Fowl", "Yakitori (Grilled chicken)", "Mizutaki"]
+  hours: 
+    - 'dinner' : []
+    - 'generic': [!!python/tuple ['17:30', '23:00']] 
+    - 'lunch'  : []
+  price_lunch  : !!python/tuple [4000, 9000, "yen"]
+  price_dinner : !!python/tuple [4000, 9000, "yen"]
+  rating_total : 3.15
+  rating_lunch : 0
+  rating_dinner: 3.15
+  smoking: True
+  city: "Kyoto"
+
+
+

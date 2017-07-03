@@ -3,6 +3,7 @@ import requests
 from collections import defaultdict
 from pandas import read_html
 import re
+from ..models.LocationEntry import LocationEntry
 
 
 
@@ -88,9 +89,9 @@ def normalize_budget(string):
     return res
 
 def normalize_hours(string):
-    res = {"dinner" : None,
-           "lunch"  : None,
-           "generic": None}
+    res = {"dinner" : "",
+           "lunch"  : "",
+           "generic": ""}
     # Try grabbing day/night first, then just grab any
     dinner = NORMALIZE_DINNER_HOURS_REGEX.search(string)
     lunch = NORMALIZE_LUNCH_HOURS_REGEX.search(string)
@@ -108,12 +109,17 @@ def normalize_hours(string):
     return res
     
 
-def normalize_address(string):
-    pass
-
 def normalize_tel(string):
     datum = NORMALIZE_TEL_REGEX.findall(string)
     return datum
+
+# New era of normalization
+def normalize_generic(data_dict, key, func):
+    for lang in data_dict:
+        data_dict[lang][key] = func(data_dict[lang][key])
+def normalize_address(data_dict):
+    for language in data_dict:
+        data_dict[language]["address"] = data_dict[language]["address"].split()[0]
 
 
 def normalize(data_dict):
@@ -121,13 +127,21 @@ def normalize(data_dict):
     Normalizes the data dict in a new "normalized" key, converting the unstructured data to structured data
         Probably a better idea to normalize to
     """
+
+
     normalized = dict()
-    for key, item in data_dict["jp"].items():
-        normalized[key] = item
     normalized["budget"] = normalize_budget(data_dict["jp"]["budget"])
     normalized["hours"] = normalize_hours(data_dict["jp"]["hours"])
     normalized["tel"] = normalize_tel(data_dict["jp"]["tel"])
+    # Revamp the normalization system later
+    normalize_address(data_dict)
+    normalize_generic(data_dict, "rating_total", lambda x: float(x) if x != "-" else 0)
+    normalize_generic(data_dict, "rating_lunch", lambda x: float(x) if x != "-" else 0)
+    normalize_generic(data_dict, "rating_dinner", lambda x: float(x) if x != "-" else 0)
+
     data_dict["normalized"] = normalized
+    location_data = LocationEntry(data_dict)
+    return location_data
 
 
 def get_budget(df):
@@ -205,9 +219,8 @@ def parse_tabelog(edata, jdata):
             raise
 
     # Various cleanup steps to be added in the future
-    normalize(res)
-    return res["normalized"]
-    return res
+    return normalize(res)
+    
 
 if __name__ == "__main__":
     from pprint import pprint
