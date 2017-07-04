@@ -4,6 +4,7 @@ from collections import defaultdict
 from pandas import read_html
 import re
 from ..models.LocationEntry import LocationEntry
+from pprint import pprint
 
 
 
@@ -31,10 +32,10 @@ key_regex = re.compile(r"""tabelog\.com\/(\w+)\/(\w+)\/(\w+)\/(\w+)""")
 
 
 # Normalization regexes
-NORMALIZE_DINNER_BUDGET_REGEX = re.compile(r"""Dinner:\s+.([\d,]+)..([\d,]+)""")
-NORMALIZE_LUNCH_BUDGET_REGEX = re.compile(r"""Lunch:\s+.([\d,]+)..([\d,]+)""")
+NORMALIZE_DINNER_PRICE_REGEX = re.compile(r"""Dinner:\s+.([\d,]+)..([\d,]+)""")
+NORMALIZE_LUNCH_PRICE_REGEX = re.compile(r"""Lunch:\s+.([\d,]+)..([\d,]+)""")
 
-NROMALIZE_GENERIC_HOURS_REGEX = re.compile(r"""(\d+:\d+).(\d+:\d+)""")
+NORMALIZE_GENERIC_HOURS_REGEX = re.compile(r"""(\d+:\d+).(\d+:\d+)""")
 NORMALIZE_DINNER_HOURS_REGEX = re.compile(r"""夜\s(\d+:\d+).(\d+:\d+)""")
 NORMALIZE_LUNCH_HOURS_REGEX = re.compile(r"""昼\s(\d+:\d+).(\d+:\d+)""")
 
@@ -61,65 +62,72 @@ def from_url_tabelog(url):
     return res
 
 # Normalization functions. These handle the textual data, converting them into a more structured form
-# All normalization functions assume that the jdata is being passed
-def normalize_budget(string):
+# Normalization functions assume that the jdata is being passed unless the function ends with _lang
+def normalize_price(data_dict):
     """
-    Handles a budget string, producing a structure as per below:
-    {dinner_low: (1000, "yen"),
-     dinner_high: (2000, "yen"),
-     dinner_mean: (1500, "yen"),
-     lunch_low: (1000, "yen"),
-     lunch_high: (2000, "yen"),
-     lunch_mean: (1500, "yen"),
-    }
+    normalize_price:
+    Given a data_dict, generates structured price values from the japanese data
+    args:
+
+    returns
+    dictionary object of structure:
+        {"price_dinner": (<num low>, <num hight>, <str currencyunit>),
+         "price_lunch": (<num low>, <num hight>, <str currencyunit>)
+        }
+    if no price is given, store None instead
     """
-    dinner = NORMALIZE_DINNER_BUDGET_REGEX.search(string)
-    lunch = NORMALIZE_LUNCH_BUDGET_REGEX.search(string)
-    res = dict()
+    dinner = NORMALIZE_DINNER_PRICE_REGEX.search(data_dict["jp"]["price"])
+    lunch = NORMALIZE_LUNCH_PRICE_REGEX.search(data_dict["jp"]["price"])
+    res = {"price_dinner": None,
+           "price_lunch" : None}
     if dinner:
         datum = dinner.groups()
         datum = [int(i.replace(",", "")) for i in datum]
-        res["dinner"] = (datum[0], datum[1], "yen")
+        res["price_dinner"] = (datum[0], datum[1], "yen")
 
     if lunch:
         datum = lunch.groups()
         datum = [int(i.replace(",", "")) for i in datum]
-        res["lunch"] = (datum[0], datum[1], "yen")
-
+        res["price_lunch"] = (datum[0], datum[1], "yen")
     return res
 
-def normalize_hours(string):
-    res = {"dinner" : "",
-           "lunch"  : "",
-           "generic": ""}
+def normalize_hours(data_dict):
+    string = data_dict["jp"]["hours"]
+    res = {"dinner" : None,
+           "lunch"  : None,
+           "generic": None}
     # Try grabbing day/night first, then just grab any
     dinner = NORMALIZE_DINNER_HOURS_REGEX.search(string)
     lunch = NORMALIZE_LUNCH_HOURS_REGEX.search(string)
     # Use a generic finder if not split by time
     if not dinner and not lunch:
-        generic = NROMALIZE_GENERIC_HOURS_REGEX.findall(string)
+        generic = NORMALIZE_GENERIC_HOURS_REGEX.findall(string)
         if not generic:
-            return res
+            data_dict["normalized"]["hours"] = res
+            return
         res["generic"] = generic
-        return res
     if dinner:
         res["dinner"] = dinner.groups()
     if lunch:
         res["lunch"] = lunch.groups()
     return res
     
+def normalize_tel(data_dict):
+    datum = NORMALIZE_TEL_REGEX.findall(data_dict["jp"]["tel"])
+    return datum[0]
 
-def normalize_tel(string):
-    datum = NORMALIZE_TEL_REGEX.findall(string)
-    return datum
-
-# New era of normalization
 def normalize_generic(data_dict, key, func):
     for lang in data_dict:
+        if lang == "normalized":
+            continue
         data_dict[lang][key] = func(data_dict[lang][key])
-def normalize_address(data_dict):
+
+
+def normalize_address_lang(data_dict):
+    res = {language: dict() for language in data_dict}
     for language in data_dict:
-        data_dict[language]["address"] = data_dict[language]["address"].split()[0]
+        res[language]["address"] = data_dict[language]["address"].split()[0]
+    return res
 
 
 def normalize(data_dict):
@@ -128,25 +136,28 @@ def normalize(data_dict):
         Probably a better idea to normalize to
     """
 
-
+    #Create a normalized dataset to hold all fields that will be normalized
     normalized = dict()
-    normalized["budget"] = normalize_budget(data_dict["jp"]["budget"])
-    normalized["hours"] = normalize_hours(data_dict["jp"]["hours"])
-    normalized["tel"] = normalize_tel(data_dict["jp"]["tel"])
-    # Revamp the normalization system later
-    normalize_address(data_dict)
-    normalize_generic(data_dict, "rating_total", lambda x: float(x) if x != "-" else 0)
-    normalize_generic(data_dict, "rating_lunch", lambda x: float(x) if x != "-" else 0)
-    normalize_generic(data_dict, "rating_dinner", lambda x: float(x) if x != "-" else 0)
+    # Normalize_price
+    normalized.update(normalize_price(data_dict))
 
-    data_dict["normalized"] = normalized
+
+    # normalize_hours(data_dict)
+    # normalize_tel(data_dict)
+    # # Revamp the normalization system later
+    # normalize_address(data_dict)
+    # pprint(data_dict)
+    # normalize_generic(data_dict, "rating_total", lambda x: float(x) if x != "-" else 0)
+    # normalize_generic(data_dict, "rating_lunch", lambda x: float(x) if x != "-" else 0)
+    # normalize_generic(data_dict, "rating_dinner", lambda x: float(x) if x != "-" else 0)
+
     location_data = LocationEntry(data_dict)
     return location_data
 
 
-def get_budget(df):
+def get_price(df):
     """
-    Given a tabelog_english data frame, extracts the first budget row found
+    Given a tabelog_english data frame, extracts the first price row found
         This was done because of multiple potential keys
     """
     #print(list(df.index))
@@ -159,7 +170,8 @@ def get_budget(df):
 
 def parse_tabelog(edata, jdata):
     """
-    Takes in english and japanese html data
+    Takes in english and japanese html data and returns a raw, parsing of
+    the data within
     """
 
     jtree = fromstring(jdata)
@@ -179,7 +191,7 @@ def parse_tabelog(edata, jdata):
     etabelog_tables = read_html(edata, match = 'TEL/reservation|Private use', index_col = 0)
     estore_data = etabelog_tables[0].append(etabelog_tables[1])
 
-    budget = get_budget(estore_data)
+    price = get_price(estore_data)
 
 
     # Key for dict, rowname for japanese and english sites
@@ -192,13 +204,13 @@ def parse_tabelog(edata, jdata):
                   ("rest", "定休日", "Shop holidays"),
                   ("smoking", "禁煙・喫煙", "Non-smoking/smoking"))
 
-    res = {"en": defaultdict(str, {"budget": budget,
+    res = {"en": defaultdict(str, {"price": price,
                    "rating_total": rating_total,
                    "rating_dinner": rating_dinner, 
                    "rating_lunch": rating_lunch,
                    "city": city_en,
                 }), 
-            "jp": defaultdict(str, {"budget": budget,
+            "jp": defaultdict(str, {"price": price,
                    "rating_total": rating_total,
                    "rating_dinner": rating_dinner, 
                    "rating_lunch": rating_lunch,
@@ -219,7 +231,7 @@ def parse_tabelog(edata, jdata):
             raise
 
     # Various cleanup steps to be added in the future
-    return normalize(res)
+    return res
     
 
 if __name__ == "__main__":
